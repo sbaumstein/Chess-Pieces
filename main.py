@@ -10,6 +10,10 @@ from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 
 # Step 1: Data Loading and Processing
+
+data_folder = "/Users/joeykatz/Desktop/Machine Learning/Where-s-Waldo/training_images"
+csv_file = "/Users/joeykatz/Desktop/Machine Learning/Where-s-Waldo/annotations.csv"
+
 class WaldoDataset(Dataset):
     def __init__(self, data_folder, csv_file, transform=None):
         self.data = self.load_data(data_folder, csv_file)
@@ -35,8 +39,7 @@ class WaldoDataset(Dataset):
 
         return data
     
-data_folder = "/Users/sambaumstein/Desktop/Where's Waldo/Where-s-Waldo/training_images"
-csv_file = "/Users/sambaumstein/Desktop/Where's Waldo/Where-s-Waldo/annotations.csv"
+
 
 # Data transformations -- resizes, converts to tensor and normalizes every image so it can be used for deep learning
 transform = transforms.Compose([
@@ -74,6 +77,7 @@ model = create_cnn(num_classes)
 
 # Step 3: Training Loop
 def train_model(model, train_loader, criterion, optimizer, num_epochs):
+    print(train_loader)
     model.train()
     for epoch in range(num_epochs):
         running_loss = 0.0

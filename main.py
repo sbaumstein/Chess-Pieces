@@ -90,17 +90,20 @@ def train_model(model, train_loader, criterion, optimizer, num_epochs):
 # Step 4: Evaluation
 def evaluate_model(model, test_loader):
     model.eval()
-    # TODO: Implement evaluation code and compute metrics
+    correct_predictions = 0
+    total_predictions = 0
+
+    with torch.no_grad():
+        for images, targets in test_loader:
+            outputs = model(images)
+            _, predicted = torch.max(outputs, 1)
+            total_predictions += targets.size(0)
+            correct_predictions += (predicted == targets).sum().item()
+
+    accuracy = 100 * correct_predictions / total_predictions
+    print(f'Accuracy: {accuracy:.2f}%')
 
 # Step 5: Inference
-import cv2
-import numpy as np
-
-import cv2
-import numpy as np
-
-import cv2
-
 def inference(model, image, test_image_name):
     model.eval()
 

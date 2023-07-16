@@ -1,184 +1,153 @@
-import torchvision
+import os
+import pandas as pd
+from PIL import Image
 import torch
 import torch.nn as nn
-import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
 import torchvision.transforms as transforms
-import csv
-import os
-import cv2
-
-from matplotlib import pyplot as plt
-from matplotlib import image as mpimg
-from torch.utils.data import Dataset, DataLoader
-from PIL import Image
+from sklearn.model_selection import train_test_split
 
 # Step 1: Data Loading and Processing
-class WaldoDataset(Dataset):
-    def __init__(self, data_folder, csv_file, transform=None):
-        self.data = self.load_data(data_folder, csv_file)
+class ChessPieceDataset(Dataset):
+    def __init__(self, data, folder_path, transform=None):
+        self.data = data
+        self.folder_path = folder_path
         self.transform = transform
 
     def __len__(self):
         return len(self.data)
     
     def __getitem__(self, index):
-        image_path = self.data[index]['image_path']
-        target = self.data[index]['target']
+        image_filename = self.data['filename'][index]
+        image_path = os.path.join(self.folder_path, image_filename)
         
         image = Image.open(image_path).convert('RGB')
 
         if self.transform is not None:
             image = self.transform(image)
 
-        target = torch.tensor(target, dtype=torch.float32)  # Convert target to a tensor
+        target_str = self.data['class'][index]  # Use the 'class' column as the target
+        target = self.get_target_index(target_str)  # Convert target to class index
+        target = torch.tensor(target, dtype=torch.long)  # Convert target to tensor
 
         return image, target
 
-    def load_data(self, data_folder, csv_file):
-        data = []
-        with open(csv_file, 'r') as file:
-            reader = csv.reader(file)
-            next(reader)  # Skip header row
-            for row in reader:
-                image_filename = row[0]
-                image_path = os.path.join(data_folder, image_filename)
-                target = [int(coord) for coord in row[4:]]  # Assuming coordinates are integers
+    def get_target_index(self, target_str):
+        class_mapping = {
+            'black-king': 0, 'black-queen': 1, 'black-rook': 2, 'black-bishop': 3,
+            'black-knight': 4, 'black-pawn': 5, 'white-king': 6, 'white-queen': 7,
+            'white-rook': 8, 'white-bishop': 9, 'white-knight': 10, 'white-pawn': 11
+        }
+        return class_mapping[target_str]
 
-                data.append({
-                    'image_path': image_path,
-                    'target': target
-                })
-
-        return data
-
-# Step 2: Model Architecture: Using a generic fast Convolutional Neural Network and editing as training goes on
-def create_cnn(num_classes):
+# Step 2: Model Architecture
+def create_cnn():
     model = nn.Sequential(
-        nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
+        nn.Conv2d(3, 6, 5),
+        nn.MaxPool2d(2, 2),
         nn.ReLU(),
-        nn.MaxPool2d(kernel_size=2, stride=2),
-        nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+        nn.Conv2d(6, 16, 5),
+        nn.MaxPool2d(2, 2),
         nn.ReLU(),
-        nn.MaxPool2d(kernel_size=2, stride=2),
         nn.Flatten(),
-        nn.Linear(32 * 56 * 56, num_classes)  # Output 4 numbers for bounding box coordinates
+        nn.Linear(16 * 13 * 13, 120),
+        nn.ReLU(),
+        nn.Linear(120, 84),
+        nn.ReLU(),
+        nn.Linear(84, 12)
     )
     return model
 
 
 # Step 3: Training Loop
 def train_model(model, train_loader, criterion, optimizer, num_epochs):
-    model.train()
     for epoch in range(num_epochs):
         running_loss = 0.0
         for images, targets in train_loader:
             optimizer.zero_grad()
             outputs = model(images)
-            
-            # Reshape the targets to match the output format
-            targets = targets.view(-1, 4)
-            
             loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
-
             running_loss += loss.item()
 
         epoch_loss = running_loss / len(train_loader)
         print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}')
 
+
 # Step 4: Evaluation
 def evaluate_model(model, test_loader):
-    model.eval()
-    correct_predictions = 0
-    total_predictions = 0
-
+    correct = 0
+    total = 0
     with torch.no_grad():
         for images, targets in test_loader:
             outputs = model(images)
-            _, predicted = torch.max(outputs, 1)
-            total_predictions += targets.size(0)
-            correct_predictions += (predicted == targets).sum().item()
+            _, predicted = torch.max(outputs.data, 1)
+            total += targets.size(0)
+            correct += (predicted == targets).sum().item()
+    
+    print(f'Accuracy: {100 * correct / total}%')
 
-    accuracy = 100 * correct_predictions / total_predictions
-    print(f'Accuracy: {accuracy:.2f}%')
 
-# Step 5: Inference
-def inference(model, image, test_image_name):
-    model.eval()
+def predict_chess_pieces(model, image_path, transform):
+    class_mapping_inverse = {0: 'black-king', 1: 'black-queen', 2: 'black-rook', 3: 'black-bishop', 4: 'black-knight', 5: 'black-pawn', 6: 'white-king', 7: 'white-queen', 8: 'white-rook', 9: 'white-bishop', 10: 'white-knight', 11: 'white-pawn'}
+    piece_values = {'king': 0, 'queen': 9, 'rook': 5, 'bishop': 3, 'knight': 3, 'pawn': 1}
+    white_score = 0
+    black_score = 0
 
-    # Preprocess the image
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-    image = transform(image).unsqueeze(0)  # Add a batch dimension
+    image = Image.open(image_path).convert('RGB')
+    if transform is not None:
+        image = transform(image).unsqueeze(0)
 
-    # Pass the image through the model
     with torch.no_grad():
         outputs = model(image)
+        _, predicted = torch.max(outputs.data, 1)
+        predicted_class = class_mapping_inverse[predicted.item()]
+        color, piece = predicted_class.split('-')
 
-    # Extract the predicted bounding box coordinates
-    predicted_coords = outputs.squeeze().tolist()
+        if color == 'white':
+            white_score += piece_values[piece]
+        else:
+            black_score += piece_values[piece]
 
-    # Load the original image using OpenCV for visualization
-    original_image = cv2.imread(test_image_name)
-
-    # Convert the coordinates to pixel values
-    img_height, img_width, _ = original_image.shape
-    xmin = int(predicted_coords[0] * img_width)
-    ymin = int(predicted_coords[1] * img_height)
-    xmax = int(predicted_coords[2] * img_width)
-    ymax = int(predicted_coords[3] * img_height)
-
-    # Draw the bounding box on the original image
-    thickness = 2
-    color = (0, 0, 255)  # BGR format: (Blue, Green, Red)
-    cv2.rectangle(original_image, (xmin, ymin), (xmax, ymax), color, thickness)
-
-    # Display the image with the bounding box
-    cv2.imshow('Inference Result', original_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    return white_score, black_score
 
 # Main script
 if __name__ == '__main__':
-    # Set your data paths, hyperparameters, and other configurations
-    batch_size = 36
-    num_epochs = 50
-    learning_rate = 0.001
-    csv_file = "annotations.csv"
-    data_folder = "training_images"
+    # Load data
+    csv_file = 'train_annotations.csv'
+    train_data = 'train'
+    column_names = ['filename', 'width', 'height', 'class', 'xmin', 'ymin', 'xmax', 'ymax']
+    annotations = pd.read_csv('train_annotations.csv', names=column_names, skiprows=1)
+    annotations.dropna(inplace=True)  # Drop rows with missing values
+    class_mapping = {'black-king': 0, 'black-queen': 1, 'black-rook': 2, 'black-bishop': 3, 'black-knight': 4, 'black-pawn': 5, 'white-king': 6, 'white-queen': 7, 'white-rook': 8, 'white-bishop': 9, 'white-knight': 10, 'white-pawn': 11}
+    data = [{'filename': row['filename'], 'class': row['class']} for _, row in annotations.iterrows()]
+    # Create test datasets and data loaders
+    transform = transforms.Compose([transforms.Resize((64, 64)), transforms.ToTensor()])
+    train_dataset = ChessPieceDataset(data, train_data, transform=transform)  # Pass the data DataFrame to the dataset
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 
-    # Data transformations -- resizes, converts to tensor and normalizes every image so it can be used for deep learning
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-
-    # Create dataset and data loaders
-    dataset = WaldoDataset(data_folder, csv_file, transform=transform)
-    train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-    # Create model instance
-    num_classes = 4  # 4 coordinates for bounding box
-    model = create_cnn(num_classes)
+    # Create model
+    model = create_cnn()
 
     # Define loss function and optimizer
-    criterion = nn.MSELoss()  # Use mean squared error loss for bounding box regression
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
     # Train the model
-    train_model(model, train_loader, criterion, optimizer, num_epochs)
+    train_model(model, train_loader, criterion, optimizer, num_epochs=10)
 
     # Evaluate the model
-    test_loader = DataLoader(dataset, batch_size=1, shuffle=False)
-    evaluate_model(model, test_loader)
+    evaluate_model(model, train_loader)
 
-    # Perform inference
-
-    test_image_name = '1test.jpg'
-    test_image = Image.open(test_image_name).convert('RGB')
-    inference(model, test_image, test_image_name)
+    # After training
+    test_image_filename = input('Enter the name of the test image file (e.g., test_image.jpg): ')
+    test_image_path = os.path.join('path_to_your_test_images_folder', test_image_filename)
+    white_score, black_score = predict_chess_pieces(model, test_image_path, transform)
+    print(f'White Score: {white_score}, Black Score: {black_score}')
+    if white_score > black_score:
+        print('White is up by', white_score - black_score, 'points')
+    elif black_score > white_score:
+        print('Black is up by', black_score - white_score, 'points')
+    else:
+        print('The game is tied')

@@ -114,9 +114,9 @@ def predict_chess_pieces(model, image_path, transform):
 # Main script
 if __name__ == '__main__':
     # Load data
-    csv_file = 'train_annotations.csv'
-    train_data = 'train'
-    column_names = ['filename', 'width', 'height', 'class', 'xmin', 'ymin', 'xmax', 'ymax']
+    csv_file = 'chess.csv'
+    train_data = 'chess_train_data'
+    column_names = ['filename', 'class']
     annotations = pd.read_csv('train_annotations.csv', names=column_names, skiprows=1)
     annotations.dropna(inplace=True)  # Drop rows with missing values
     class_mapping = {'black-king': 0, 'black-queen': 1, 'black-rook': 2, 'black-bishop': 3, 'black-knight': 4, 'black-pawn': 5, 'white-king': 6, 'white-queen': 7, 'white-rook': 8, 'white-bishop': 9, 'white-knight': 10, 'white-pawn': 11}

@@ -1,11 +1,14 @@
 import os
 import pandas as pd
-from PIL import Image
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset
 import torchvision.transforms as transforms
+
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
 from sklearn.model_selection import train_test_split
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 
 # Step 1: Data Loading and Processing
 class ChessPieceDataset(Dataset):
@@ -41,22 +44,26 @@ class ChessPieceDataset(Dataset):
 
 # Step 2: Model Architecture
 def create_cnn():
-    model = nn.Sequential(
-        nn.Conv2d(3, 6, 5),
-        nn.MaxPool2d(2, 2),
-        nn.ReLU(),
-        nn.Conv2d(6, 16, 5),
-        nn.MaxPool2d(2, 2),
-        nn.ReLU(),
-        nn.Flatten(),
-        nn.Linear(16 * 13 * 13, 120),
-        nn.ReLU(),
-        nn.Linear(120, 84),
-        nn.ReLU(),
-        nn.Linear(84, 12)
-    )
+    num_of_classes = 12
+    img_height = 64
+    img_width = 64
+    model = Sequential([
+        Conv2D(32, (3, 3), activation='relu', input_shape=(img_height, img_width, 3)),
+        MaxPooling2D(2, 2),
+        Conv2D(64, (3, 3), activation='relu'),
+        MaxPooling2D(2, 2),
+        Conv2D(64, (3, 3), activation='relu'),
+        MaxPooling2D(2, 2),
+        Conv2D(128, (3, 3), activation='relu'),
+        MaxPooling2D(2, 2),
+        Conv2D(256, (3, 3), activation='relu'),
+        MaxPooling2D(2, 2),
+        Flatten(),
+        Dense(512, activation='relu'),
+        Dense(512, activation='relu'),
+        Dense(num_of_classes, activation='softmax')
+])
     return model
-
 
 # Step 3: Training Loop
 def train_model(model, train_loader, criterion, optimizer, num_epochs):
@@ -87,13 +94,8 @@ def evaluate_model(model, test_loader):
     
     print(f'Accuracy: {100 * correct / total}%')
 
-
-def predict_chess_pieces(model, image_path, transform):
+def predict_chess_piece(model, image_path, transform):
     class_mapping_inverse = {0: 'black-king', 1: 'black-queen', 2: 'black-rook', 3: 'black-bishop', 4: 'black-knight', 5: 'black-pawn', 6: 'white-king', 7: 'white-queen', 8: 'white-rook', 9: 'white-bishop', 10: 'white-knight', 11: 'white-pawn'}
-    piece_values = {'king': 0, 'queen': 9, 'rook': 5, 'bishop': 3, 'knight': 3, 'pawn': 1}
-    white_score = 0
-    black_score = 0
-
     image = Image.open(image_path).convert('RGB')
     if transform is not None:
         image = transform(image).unsqueeze(0)
@@ -102,29 +104,31 @@ def predict_chess_pieces(model, image_path, transform):
         outputs = model(image)
         _, predicted = torch.max(outputs.data, 1)
         predicted_class = class_mapping_inverse[predicted.item()]
-        color, piece = predicted_class.split('-')
-
-        if color == 'white':
-            white_score += piece_values[piece]
-        else:
-            black_score += piece_values[piece]
-
-    return white_score, black_score
+        return predicted_class
 
 # Main script
 if __name__ == '__main__':
     # Load data
     csv_file = 'chess.csv'
-    train_data = 'chess_train_data'
+    data_folder = 'chess_train_data'
     column_names = ['filename', 'class']
-    annotations = pd.read_csv('train_annotations.csv', names=column_names, skiprows=1)
+    annotations = pd.read_csv(csv_file)
     annotations.dropna(inplace=True)  # Drop rows with missing values
-    class_mapping = {'black-king': 0, 'black-queen': 1, 'black-rook': 2, 'black-bishop': 3, 'black-knight': 4, 'black-pawn': 5, 'white-king': 6, 'white-queen': 7, 'white-rook': 8, 'white-bishop': 9, 'white-knight': 10, 'white-pawn': 11}
     data = annotations[['filename', 'class']]
-    # Create test datasets and data loaders
+    
+    # Split into train and test
+    train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
+
+    # Reset the indexes of the DataFrames
+    train_data = train_data.reset_index(drop=True)
+    test_data = test_data.reset_index(drop=True)
+
+    # Create datasets and data loaders
     transform = transforms.Compose([transforms.Resize((64, 64)), transforms.ToTensor()])
-    train_dataset = ChessPieceDataset(data, train_data, transform=transform)  # Pass the data DataFrame to the dataset
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    train_dataset = ChessPieceDataset(train_data, data_folder, transform=transform)
+    test_dataset = ChessPieceDataset(test_data, data_folder, transform=transform)
+    train_loader = DataLoader(train_dataset, batch_size=100, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=100, shuffle=False)
 
     # Create model
     model = create_cnn()
@@ -134,19 +138,13 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
     # Train the model
-    train_model(model, train_loader, criterion, optimizer, num_epochs=4)
+    train_model(model, train_loader, criterion, optimizer, num_epochs=50)
 
     # Evaluate the model
-    evaluate_model(model, train_loader)
+    evaluate_model(model, test_loader)
 
     # After training
     test_image_filename = input('Enter the name of the test image file (e.g., test_image.jpg): ')
-    test_image_path = os.path.join(input('Enter the name of the test image folder: '), test_image_filename)
-    white_score, black_score = predict_chess_pieces(model, test_image_path, transform)
-    print(f'White Score: {white_score}, Black Score: {black_score}')
-    if white_score > black_score:
-        print('White is up by', white_score - black_score, 'points')
-    elif black_score > white_score:
-        print('Black is up by', black_score - white_score, 'points')
-    else:
-        print('The game is tied')
+    test_image_path = os.path.join(data_folder, test_image_filename)
+    predicted_class = predict_chess_piece(model, test_image_path, transform)
+    print(f'Predicted class: {predicted_class}')

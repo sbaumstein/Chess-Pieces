@@ -20,7 +20,6 @@ class ChessPieceDataset(Dataset):
     def __getitem__(self, index):
         image_filename = self.data['filename'][index]
         image_path = os.path.join(self.folder_path, image_filename)
-        
         image = Image.open(image_path).convert('RGB')
 
         if self.transform is not None:
@@ -121,7 +120,7 @@ if __name__ == '__main__':
     annotations = pd.read_csv('train_annotations.csv', names=column_names, skiprows=1)
     annotations.dropna(inplace=True)  # Drop rows with missing values
     class_mapping = {'black-king': 0, 'black-queen': 1, 'black-rook': 2, 'black-bishop': 3, 'black-knight': 4, 'black-pawn': 5, 'white-king': 6, 'white-queen': 7, 'white-rook': 8, 'white-bishop': 9, 'white-knight': 10, 'white-pawn': 11}
-    data = [{'filename': row['filename'], 'class': row['class']} for _, row in annotations.iterrows()]
+    data = annotations[['filename', 'class']]
     # Create test datasets and data loaders
     transform = transforms.Compose([transforms.Resize((64, 64)), transforms.ToTensor()])
     train_dataset = ChessPieceDataset(data, train_data, transform=transform)  # Pass the data DataFrame to the dataset
@@ -135,14 +134,14 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
     # Train the model
-    train_model(model, train_loader, criterion, optimizer, num_epochs=10)
+    train_model(model, train_loader, criterion, optimizer, num_epochs=4)
 
     # Evaluate the model
     evaluate_model(model, train_loader)
 
     # After training
     test_image_filename = input('Enter the name of the test image file (e.g., test_image.jpg): ')
-    test_image_path = os.path.join('path_to_your_test_images_folder', test_image_filename)
+    test_image_path = os.path.join(input('Enter the name of the test image folder: '), test_image_filename)
     white_score, black_score = predict_chess_pieces(model, test_image_path, transform)
     print(f'White Score: {white_score}, Black Score: {black_score}')
     if white_score > black_score:

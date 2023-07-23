@@ -1,11 +1,9 @@
 filename,class
 0.png,white-king
-1.png,black-king
 2.png,white-king
 4.png,black-king
 5.png,black-king
 6.png,white-king
-7.png,white-king
 8.png,white-king
 10.png,white-king
 13.png,white-king
@@ -24,9 +22,7 @@ filename,class
 34.png,white-bishop
 35.png,white-bishop
 36.png,black-bishop
-37.png,black-bishop
 38.png,white-bishop
-39.png,white-bishop
 40.png,black-bishop
 42.png,white-bishop
 43.png,black-bishop
@@ -66,7 +62,6 @@ filename,class
 91.png,black-bishop
 93.png,white-bishop
 95.png,white-bishop
-96.png,white-rook
 97.png,white-bishop
 100.png,white-bishop
 103.png,black-rook
@@ -82,7 +77,6 @@ filename,class
 119.png,white-rook
 120.png,black-rook
 121.png,white-rook
-122.png,black-rook
 123.png,black-rook
 124.png,black-rook
 126.png,black-rook
@@ -118,14 +112,12 @@ filename,class
 171.png,black-rook
 172.png,black-rook
 173.png,black-queen
-174.png,black-queen
 175.png,white-queen
 178.png,black-queen
 179.png,white-queen
 180.png,white-queen
 181.png,black-queen
 183.png,white-queen
-184.png,white-queen
 185.png,black-queen
 186.png,white-queen
 187.png,black-queen
@@ -146,10 +138,8 @@ filename,class
 220.png,black-pawn
 221.png,black-pawn
 223.png,white-pawn
-224.png,white-pawn
 227.png,white-pawn
 228.png,white-pawn
-229.png,black-pawn
 230.png,black-pawn
 231.png,black-pawn
 234.png,black-pawn
@@ -292,7 +282,6 @@ filename,class
 471.png,black-knight
 472.png,white-knight
 473.png,black-knight
-475.png,black-knight
 476.png,black-knight
 477.png,black-knight
 478.png,black-knight
@@ -313,7 +302,6 @@ filename,class
 503.png,black-knight
 504.png,black-knight
 505.png,white-knight
-506.png,white-knight
 508.png,white-knight
 510.png,black-knight
 511.png,black-knight

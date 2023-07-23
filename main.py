@@ -7,8 +7,6 @@ import torchvision.transforms as transforms
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from sklearn.model_selection import train_test_split
-from keras.models import Sequential
-from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 
 # Step 1: Data Loading and Processing
 class ChessPieceDataset(Dataset):
@@ -44,25 +42,20 @@ class ChessPieceDataset(Dataset):
 
 # Step 2: Model Architecture
 def create_cnn():
-    num_of_classes = 12
-    img_height = 64
-    img_width = 64
-    model = Sequential([
-        Conv2D(32, (3, 3), activation='relu', input_shape=(img_height, img_width, 3)),
-        MaxPooling2D(2, 2),
-        Conv2D(64, (3, 3), activation='relu'),
-        MaxPooling2D(2, 2),
-        Conv2D(64, (3, 3), activation='relu'),
-        MaxPooling2D(2, 2),
-        Conv2D(128, (3, 3), activation='relu'),
-        MaxPooling2D(2, 2),
-        Conv2D(256, (3, 3), activation='relu'),
-        MaxPooling2D(2, 2),
-        Flatten(),
-        Dense(512, activation='relu'),
-        Dense(512, activation='relu'),
-        Dense(num_of_classes, activation='softmax')
-])
+    model = nn.Sequential(
+        nn.Conv2d(3, 6, 5),
+        nn.MaxPool2d(2, 2),
+        nn.ReLU(),
+        nn.Conv2d(6, 16, 5),
+        nn.MaxPool2d(2, 2),
+        nn.ReLU(),
+        nn.Flatten(),
+        nn.Linear(16 * 13 * 13, 120),
+        nn.ReLU(),
+        nn.Linear(120, 84),
+        nn.ReLU(),
+        nn.Linear(84, 12)
+    )
     return model
 
 # Step 3: Training Loop
@@ -111,6 +104,7 @@ if __name__ == '__main__':
     # Load data
     csv_file = 'chess.csv'
     data_folder = 'chess_train_data'
+    test_folder = 'test'
     column_names = ['filename', 'class']
     annotations = pd.read_csv(csv_file)
     annotations.dropna(inplace=True)  # Drop rows with missing values
@@ -127,8 +121,8 @@ if __name__ == '__main__':
     transform = transforms.Compose([transforms.Resize((64, 64)), transforms.ToTensor()])
     train_dataset = ChessPieceDataset(train_data, data_folder, transform=transform)
     test_dataset = ChessPieceDataset(test_data, data_folder, transform=transform)
-    train_loader = DataLoader(train_dataset, batch_size=100, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=100, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
     # Create model
     model = create_cnn()
@@ -138,13 +132,16 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
     # Train the model
-    train_model(model, train_loader, criterion, optimizer, num_epochs=50)
+    train_model(model, train_loader, criterion, optimizer, num_epochs=100)
 
     # Evaluate the model
     evaluate_model(model, test_loader)
 
     # After training
-    test_image_filename = input('Enter the name of the test image file (e.g., test_image.jpg): ')
-    test_image_path = os.path.join(data_folder, test_image_filename)
-    predicted_class = predict_chess_piece(model, test_image_path, transform)
-    print(f'Predicted class: {predicted_class}')
+    while(input != "end"):
+        test_image_filename = input('Enter the name of the test image file (e.g., test_image.jpg): ')
+        test_image_path = os.path.join(test_folder, test_image_filename)
+        predicted_class = predict_chess_piece(model, test_image_path, transform)
+        print(f'Predicted class: {predicted_class}')
+    
+    

@@ -137,11 +137,35 @@ if __name__ == '__main__':
     # Evaluate the model
     evaluate_model(model, test_loader)
 
-    # After training
-    while(input != "end"):
-        test_image_filename = input('Enter the name of the test image file (e.g., test_image.jpg): ')
+    # After training- Running the Game
+    score = 0
+    #Black is negative, white is positive
+    piece_values = {'white-queen': 9, 'black-queen': -9, 'white-rook': 5, 'black-rook': -5, 'white-bishop': 3, 'black-bishop': -3, 'white-knight': 3, 'black-knight': -3, 'white-pawn': 1, 'black-pawn': -1}
+    piece_amt = {'white-queen': 1, 'black-queen': 1, 'white-rook': 2, 'black-rook': 2, 'white-bishop': 2, 'black-bishop': 2, 'white-knight': 2, 'black-knight': 2, 'white-pawn': 8, 'black-pawn': 8}
+    total_pieces = 30
+    while(total_pieces > 0):
+        test_image_filename = input('Enter the name of image of the piece that was captured (or end): ')
+        if(test_image_filename == "end"):
+            break
         test_image_path = os.path.join(test_folder, test_image_filename)
         predicted_class = predict_chess_piece(model, test_image_path, transform)
-        print(f'Predicted class: {predicted_class}')
-    
-    
+        if(predicted_class == "white-king"):
+            print(f'Peice Lost: {predicted_class}: Check-mate, black wins')
+            break
+        elif(predicted_class == "black-king"):
+            print(f'Peice Lost: {predicted_class}: Check-mate, white wins')
+            break
+        piece_amt[predicted_class] -= 1
+        if(piece_amt[predicted_class] < 0):
+            print(f'All {predicted_class} have been taken, please enter a different piece')
+            piece_amt[predicted_class] = 0
+            continue
+        score += piece_values[predicted_class]
+        total_pieces -= 1
+        winner = "black"
+        if(score < 0):
+            winner = "white"
+        if(score == 0):
+            print(f'Peice Lost: {predicted_class}, there is no current material advantage')
+        else:
+            print(f'Peice Lost: {predicted_class}, {winner} is up {abs(score)} points of material')
